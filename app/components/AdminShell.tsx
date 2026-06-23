@@ -14,7 +14,8 @@ export function AdminShell({ children, activePage }: { children: any, activePage
           <a href="/admin/settings" className={linkClass('settings')}>Pengaturan API</a>
         </nav>
         <div className="mt-auto px-2 pb-4">
-          <a href="/admin/login" className="text-sm text-gray-400 hover:text-red-400 transition-colors">Keluar Sistem</a>
+          {/* Tautan di bawah ini sudah diperbaiki mengarah ke /admin/logout */}
+          <a href="/admin/logout" className="text-sm text-gray-400 hover:text-red-400 transition-colors">Keluar Sistem</a>
         </div>
       </aside>
       <main className="flex-1 p-8 lg:p-12 overflow-y-auto bg-gray-50">
