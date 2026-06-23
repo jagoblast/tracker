@@ -1,16 +1,21 @@
 import { createRoute } from 'honox/factory'
 import { AdminShell } from '../../components/AdminShell'
+import { hashPassword } from '../../utils/hash'
 
 export const POST = createRoute(async (c) => {
   let successMsg = '', errorMsg = ''
   const body = await c.req.parseBody()
+  const secret = c.env.JWT_SECRET || 'kunci_rahasia_cadangan_123'
   
   if (body._action === 'UPDATE_AUTH') {
     if (body.password !== body.confirm_password) {
       errorMsg = 'Konfirmasi sandi tidak cocok!'
     } else {
+      // Password di-hash sebelum masuk database
+      const hashed = await hashPassword(body.password as string, secret)
+      
       await c.env.DB.prepare('UPDATE admin_settings SET value=? WHERE key="admin_username"').bind(body.username as string).run()
-      await c.env.DB.prepare('UPDATE admin_settings SET value=? WHERE key="admin_password"').bind(body.password as string).run()
+      await c.env.DB.prepare('UPDATE admin_settings SET value=? WHERE key="admin_password"').bind(hashed).run()
       successMsg = 'Kredensial login berhasil diperbarui!'
     }
   } else if (body._action === 'UPDATE_CLOUDINARY') {
