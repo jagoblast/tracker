@@ -33,7 +33,11 @@ async function renderPage(c: any, id: string, successMsg = '') {
     <AdminShell activePage="links">
       <div className="mb-8 border-b pb-4 flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-800">Edit: {link.name}</h1>
-        <a href="/admin/links" className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded font-semibold text-sm">← Kembali</a>
+        {/* Tombol Copy Link dan Kembali ditambahkan di sini */}
+        <div className="flex gap-3">
+          <button type="button" onClick={`copyLink('${link.slug}')`} className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-800 rounded font-semibold text-sm transition shadow-sm">Copy Link</button>
+          <a href="/admin/links" className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded font-semibold text-sm transition shadow-sm">← Kembali</a>
+        </div>
       </div>
 
       {successMsg && <script dangerouslySetInnerHTML={{ __html: `Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '${successMsg}', showConfirmButton: false, timer: 3000 });`}} />}
@@ -44,37 +48,38 @@ async function renderPage(c: any, id: string, successMsg = '') {
             <input type="hidden" name="_action" value="UPDATE" />
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Internal Link</label>
-              <input type="text" name="name" defaultValue={link.name} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none bg-blue-50" required />
+              {/* defaultValue diganti menjadi value agar bisa dibaca oleh SSR HTML */}
+              <input type="text" name="name" value={link.name || ''} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none bg-blue-50" required />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Custom Slug</label>
-              <input type="text" name="slug" defaultValue={link.slug} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
+              <input type="text" name="slug" value={link.slug || ''} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Target URL Afiliasi</label>
-              <input type="url" name="target_url" defaultValue={link.target_url} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
+              <input type="url" name="target_url" value={link.target_url || ''} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
             </div>
 
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <label className="block text-sm font-semibold text-gray-700 mb-1">Fake Canonical URL</label>
-              <input type="url" name="og_url" id="input-canonical" defaultValue={link.og_url} className="w-full px-4 py-2 border rounded-lg focus:ring-yellow-500 outline-none" />
+              <input type="url" name="og_url" id="input-canonical" value={link.og_url || ''} className="w-full px-4 py-2 border rounded-lg focus:ring-yellow-500 outline-none" />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Situs / Domain</label>
-              <input type="text" name="og_site_name" id="input-domain" defaultValue={link.og_site_name} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" />
+              <input type="text" name="og_site_name" id="input-domain" value={link.og_site_name || ''} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Judul Open Graph</label>
-              <input type="text" name="og_title" id="input-title" defaultValue={link.og_title} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
+              <input type="text" name="og_title" id="input-title" value={link.og_title || ''} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Deskripsi Open Graph</label>
-              <input type="text" name="og_description" id="input-desc" defaultValue={link.og_description} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
+              <input type="text" name="og_description" id="input-desc" value={link.og_description || ''} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">URL Gambar Akhir</label>
-              <input type="url" name="og_image_url" id="input-img" defaultValue={link.og_image_url} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
+              <input type="url" name="og_image_url" id="input-img" value={link.og_image_url || ''} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
             </div>
             <button type="submit" className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition">Update Data Tautan</button>
           </form>
@@ -118,6 +123,16 @@ async function renderPage(c: any, id: string, successMsg = '') {
         }
         document.addEventListener('DOMContentLoaded', upd);
         ['input-title','input-desc','input-domain','input-canonical','input-img'].forEach(id => document.getElementById(id)?.addEventListener('input', upd));
+
+        // Script untuk Copy Link
+        window.copyLink = function(slug) {
+          const url = window.location.protocol + '//' + window.location.host + '/' + slug;
+          navigator.clipboard.writeText(url).then(() => {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Link berhasil disalin!', showConfirmButton: false, timer: 2000 });
+          }).catch(err => {
+            console.error('Gagal menyalin:', err);
+          });
+        };
 
         function confirmDelete() {
           Swal.fire({
