@@ -2,22 +2,29 @@ import { createRoute } from 'honox/factory'
 import { sign } from 'hono/jwt'
 import { setCookie } from 'hono/cookie'
 
-export default createRoute(async (c) => {
-  if (c.req.method === 'POST') {
-    const body = await c.req.parseBody()
-    const admin = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_password"').first<string>()
-    const userDb = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_username"').first<string>()
+// 1. Tangkap metode POST (Saat form disubmit)
+export const POST = createRoute(async (c) => {
+  const body = await c.req.parseBody()
+  const inputUsername = body.username as string
+  const inputPassword = body.password as string
 
-    if (body.username === userDb && body.password === admin) {
-      const token = await sign({ username: body.username, exp: Math.floor(Date.now() / 1000) + 86400 }, c.env.JWT_SECRET)
-      setCookie(c, 'auth_token', token, { path: '/', httpOnly: true, secure: true, sameSite: 'Strict' })
-      return c.redirect('/admin/dashboard')
-    }
-    return c.render(<LoginUI error="Username atau password salah!" />)
+  const adminRes = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_password"').first<{value: string}>()
+  const userDbRes = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_username"').first<{value: string}>()
+
+  if (inputUsername === userDbRes?.value && inputPassword === adminRes?.value) {
+    const token = await sign({ username: inputUsername, exp: Math.floor(Date.now() / 1000) + 86400 }, c.env.JWT_SECRET)
+    setCookie(c, 'auth_token', token, { path: '/', httpOnly: true, secure: true, sameSite: 'Strict' })
+    return c.redirect('/admin/dashboard')
   }
+  return c.render(<LoginUI error="Username atau password salah!" />)
+})
+
+// 2. Tangkap metode GET (Saat halaman pertama dibuka)
+export default createRoute((c) => {
   return c.render(<LoginUI />)
 })
 
+// --- KOMPONEN UI ---
 function LoginUI({ error }: { error?: string }) {
   return (
     <div className="flex items-center justify-center min-h-screen w-full bg-gray-100 p-4">
