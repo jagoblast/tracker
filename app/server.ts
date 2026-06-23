@@ -11,9 +11,8 @@ app.use('/*', async (c, next) => {
 
   const lookupSlug = path.substring(1)
   
-  // PERBARUAN: Tambahkan pengambilan kolom og_url
   const link = await c.env.DB.prepare('SELECT * FROM links WHERE slug = ?').bind(lookupSlug).first<{
-    target_url: string, og_title: string, og_description: string, og_image_url: string, og_site_name: string, og_url: string
+    target_url: string, og_title: string, og_description: string, og_image_url: string, og_site_name: string
   }>()
 
   if (!link) return c.text('Link tidak ditemukan', 404)
@@ -22,8 +21,8 @@ app.use('/*', async (c, next) => {
   const isBot = /facebookexternalhit|WhatsApp|Twitterbot|Pinterest|LinkedInBot|TelegramBot/i.test(userAgent)
 
   if (isBot) {
-    // PERBARUAN: Gunakan og_url dari database, jika kosong gunakan URL request saat ini
-    const canonicalUrl = link.og_url ? link.og_url : c.req.url
+    // KUNCI RAHASIA: Kurung bot agar tidak kabur dengan memberikan URL dirinya sendiri
+    const selfUrl = c.req.url
 
     return c.html(`
       <!DOCTYPE html>
@@ -32,8 +31,8 @@ app.use('/*', async (c, next) => {
         <meta charset="UTF-8" />
         <title>${link.og_title}</title>
         
-        <meta property="og:url" content="${canonicalUrl}" />
-        <link rel="canonical" href="${canonicalUrl}" />
+        <meta property="og:url" content="${selfUrl}" />
+        <link rel="canonical" href="${selfUrl}" />
         
         <meta property="og:type" content="article" />
         <meta property="og:title" content="${link.og_title}" />
@@ -61,6 +60,7 @@ app.use('/*', async (c, next) => {
     } catch (e) {}
   }
 
+  // Jika pengunjung adalah MANUSIA, langsung ditendang ke Shopee/Tokopedia
   return c.redirect(link.target_url, 302)
 })
 
