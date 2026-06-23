@@ -1,29 +1,33 @@
 import { createRoute } from 'honox/factory'
 import { AdminShell } from '../../components/AdminShell'
 
-export default createRoute(async (c) => {
+export const POST = createRoute(async (c) => {
   let successMsg = '', errorMsg = ''
-
-  if (c.req.method === 'POST') {
-    const body = await c.req.parseBody()
-    if (body._action === 'UPDATE_AUTH') {
-      if (body.password !== body.confirm_password) {
-        errorMsg = 'Konfirmasi sandi tidak cocok!'
-      } else {
-        await c.env.DB.prepare('UPDATE admin_settings SET value=? WHERE key="admin_username"').bind(body.username as string).run()
-        await c.env.DB.prepare('UPDATE admin_settings SET value=? WHERE key="admin_password"').bind(body.password as string).run()
-        successMsg = 'Kredensial login berhasil diperbarui!'
-      }
-    } else if (body._action === 'UPDATE_CLOUDINARY') {
-      await c.env.DB.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES ("cloudinary_cloud_name", ?)').bind(body.cloud_name as string).run()
-      await c.env.DB.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES ("cloudinary_api_key", ?)').bind(body.api_key as string).run()
-      await c.env.DB.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES ("cloudinary_secret", ?)').bind(body.api_secret as string).run()
-      successMsg = 'Kredensial API Gambar tersimpan!'
-    }
-  }
-
-  const getSetting = async (key: string) => (await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key=?').bind(key).first<{value: string}>())?.value || ''
+  const body = await c.req.parseBody()
   
+  if (body._action === 'UPDATE_AUTH') {
+    if (body.password !== body.confirm_password) {
+      errorMsg = 'Konfirmasi sandi tidak cocok!'
+    } else {
+      await c.env.DB.prepare('UPDATE admin_settings SET value=? WHERE key="admin_username"').bind(body.username as string).run()
+      await c.env.DB.prepare('UPDATE admin_settings SET value=? WHERE key="admin_password"').bind(body.password as string).run()
+      successMsg = 'Kredensial login berhasil diperbarui!'
+    }
+  } else if (body._action === 'UPDATE_CLOUDINARY') {
+    await c.env.DB.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES ("cloudinary_cloud_name", ?)').bind(body.cloud_name as string).run()
+    await c.env.DB.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES ("cloudinary_api_key", ?)').bind(body.api_key as string).run()
+    await c.env.DB.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES ("cloudinary_secret", ?)').bind(body.api_secret as string).run()
+    successMsg = 'Kredensial API Gambar tersimpan!'
+  }
+  return await renderPage(c, successMsg, errorMsg)
+})
+
+export default createRoute(async (c) => {
+  return await renderPage(c)
+})
+
+async function renderPage(c: any, successMsg = '', errorMsg = '') {
+  const getSetting = async (key: string) => (await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key=?').bind(key).first<{value: string}>())?.value || ''
   const user = await getSetting('admin_username')
   const cloudName = await getSetting('cloudinary_cloud_name')
   const apiKey = await getSetting('cloudinary_api_key')
@@ -83,4 +87,4 @@ export default createRoute(async (c) => {
     </AdminShell>,
     { title: 'Pengaturan' }
   )
-})
+}
