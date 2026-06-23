@@ -17,6 +17,7 @@ export const POST = createRoute(async (c) => {
   let slug = (body.slug as string).replace(/^\/+|\/+$/g, '')
   let finalImageUrl = body.og_image_url as string || ''
   let siteName = body.og_site_name as string || ''
+  let ogUrl = body.og_url as string || '' // Tangkap Canonical URL
 
   const imageFile = body.image_file as File
   if (imageFile && imageFile.size > 0) {
@@ -51,8 +52,9 @@ export const POST = createRoute(async (c) => {
   }
 
   if (!errorMsg) {
-    await c.env.DB.prepare('INSERT INTO links (name, slug, target_url, og_title, og_description, og_image_url, og_site_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(name, slug, body.target_url as string, body.og_title as string, body.og_description as string, finalImageUrl, siteName).run()
+    // Insert dengan og_url
+    await c.env.DB.prepare('INSERT INTO links (name, slug, target_url, og_title, og_description, og_image_url, og_site_name, og_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(name, slug, body.target_url as string, body.og_title as string, body.og_description as string, finalImageUrl, siteName, ogUrl).run()
     successMsg = 'Tautan afiliasi baru berhasil dibuat!'
   }
 
@@ -92,9 +94,15 @@ async function renderPage(c: any, successMsg = '', errorMsg = '') {
               <label className="block text-sm font-semibold text-gray-700 mb-1">Target URL Afiliasi</label>
               <input type="url" name="target_url" placeholder="https://shopee..." className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
             </div>
+
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Fake Canonical URL (Berita Besar)</label>
+              <input type="url" name="og_url" id="input-canonical" placeholder="Misal: https://news.detik.com/berita/..." className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none" />
+            </div>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Situs / Domain (Opsional)</label>
-              <input type="text" name="og_site_name" id="input-domain" placeholder="Misal: Toko Laris" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+              <input type="text" name="og_site_name" id="input-domain" placeholder="Misal: Detik News" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Judul Open Graph</label>
@@ -104,6 +112,7 @@ async function renderPage(c: any, successMsg = '', errorMsg = '') {
               <label className="block text-sm font-semibold text-gray-700 mb-1">Deskripsi Open Graph</label>
               <input type="text" name="og_description" id="input-desc" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
             </div>
+            
             <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Upload Gambar (Cloudinary)</label>
               <input type="file" name="image_file" accept="image/*" id="input-img-file" className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
@@ -111,6 +120,7 @@ async function renderPage(c: any, successMsg = '', errorMsg = '') {
               <label className="block text-xs font-semibold text-gray-500 mb-1">Tempel URL Gambar Eksternal</label>
               <input type="url" name="og_image_url" id="input-img-url" placeholder="https://..." className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none" />
             </div>
+
             <button type="submit" className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition">Simpan & Upload</button>
           </form>
         </div>
@@ -136,7 +146,10 @@ async function renderPage(c: any, successMsg = '', errorMsg = '') {
                   <tr key={l.id} className="hover:bg-gray-50">
                     <td className="p-4 font-semibold text-gray-800">{l.name}</td>
                     <td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">/{l.slug}</span></td>
-                    <td className="p-4"><a href={`/admin/links/${l.id}`} className="bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded text-xs font-semibold">Edit</a></td>
+                    <td className="p-4 flex gap-2">
+                      <button type="button" onClick={`copyLink('${l.slug}')`} className="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1.5 rounded text-xs font-semibold transition">Copy</button>
+                      <a href={`/admin/links/${l.id}`} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded text-xs font-semibold transition">Edit</a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -149,13 +162,23 @@ async function renderPage(c: any, successMsg = '', errorMsg = '') {
         function upd() {
           document.getElementById('prev-title').innerText = document.getElementById('input-title').value || 'Judul Menarik Di Sini';
           document.getElementById('prev-desc').innerText = document.getElementById('input-desc').value || 'Deskripsi singkat penawaran...';
+          
           const domainInput = document.getElementById('input-domain').value;
-          document.getElementById('prev-domain').innerText = (domainInput || window.location.hostname).toUpperCase();
+          const canonicalInput = document.getElementById('input-canonical').value;
+          let displayDomain = window.location.hostname;
+          if (domainInput) {
+            displayDomain = domainInput;
+          } else if (canonicalInput) {
+            try { displayDomain = new URL(canonicalInput).hostname; } catch(e) {}
+          }
+          document.getElementById('prev-domain').innerText = displayDomain.toUpperCase();
+          
           const urlInput = document.getElementById('input-img-url').value;
           if(urlInput) document.getElementById('prev-img').src = urlInput;
         }
         document.addEventListener('DOMContentLoaded', upd);
-        ['input-title','input-desc','input-domain','input-img-url'].forEach(id => document.getElementById(id)?.addEventListener('input', upd));
+        ['input-title','input-desc','input-domain','input-canonical','input-img-url'].forEach(id => document.getElementById(id)?.addEventListener('input', upd));
+        
         document.getElementById('input-img-file').addEventListener('change', function(e) {
           const file = e.target.files[0];
           if(file) {
@@ -163,6 +186,15 @@ async function renderPage(c: any, successMsg = '', errorMsg = '') {
             document.getElementById('input-img-url').value = ''; 
           }
         });
+
+        window.copyLink = function(slug) {
+          const url = window.location.protocol + '//' + window.location.host + '/' + slug;
+          navigator.clipboard.writeText(url).then(() => {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Link berhasil disalin!', showConfirmButton: false, timer: 2000 });
+          }).catch(err => {
+            console.error('Gagal menyalin:', err);
+          });
+        };
       `}} />
     </AdminShell>,
     { title: 'Manajemen Links' }
