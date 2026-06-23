@@ -6,13 +6,14 @@ app.use('/*', async (c, next) => {
   const path = c.req.path
   
   if (path.startsWith('/admin') || path === '/' || path.startsWith('/static')) {
-    // PERBAIKAN 3: Wajib ada kata "return" agar Response halaman admin diproses
     return await next()
   }
 
   const lookupSlug = path.substring(1)
+  
+  // PERBAIKAN 1: Tambahkan og_site_name pada tipe kembalian database
   const link = await c.env.DB.prepare('SELECT * FROM links WHERE slug = ?').bind(lookupSlug).first<{
-    target_url: string, og_title: string, og_description: string, og_image_url: string
+    target_url: string, og_title: string, og_description: string, og_image_url: string, og_site_name: string
   }>()
 
   if (!link) return c.text('Link tidak ditemukan', 404)
@@ -32,7 +33,9 @@ app.use('/*', async (c, next) => {
         <meta property="og:title" content="${link.og_title}" />
         <meta property="og:description" content="${link.og_description}" />
         <meta property="og:image" content="${link.og_image_url}" />
-        <meta property="og:site_name" content="${link.og_site_name}" />
+        
+        ${link.og_site_name ? `<meta property="og:site_name" content="${link.og_site_name}" />` : ''}
+        
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="${link.og_title}" />
         <meta name="twitter:description" content="${link.og_description}" />
