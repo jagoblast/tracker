@@ -106,6 +106,6 @@ export default createRoute(async (c) => {
         }
       `}} />
     </AdminShell>,
-    { title: \`Edit \${link.name}\` }
+    { title: 'Edit ' + link.name }
   )
 })
