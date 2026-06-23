@@ -2,20 +2,28 @@ import { createRoute } from 'honox/factory'
 import { sign } from 'hono/jwt'
 import { setCookie } from 'hono/cookie'
 
-// 1. Tangkap metode POST (Saat form disubmit)
+// 1. Tangkap metode POST (Saat form login ditekan)
 export const POST = createRoute(async (c) => {
   const body = await c.req.parseBody()
   const inputUsername = body.username as string
   const inputPassword = body.password as string
 
-  const adminRes = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_password"').first<{value: string}>()
-  const userDbRes = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_username"').first<{value: string}>()
+  // AMBIL STRING SECARA LANGSUNG DARI KOLOM 'value'
+  const realUsername = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_username"').first<string>('value')
+  const realPassword = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_password"').first<string>('value')
 
-  if (inputUsername === userDbRes?.value && inputPassword === adminRes?.value) {
+  // DETEKSI CERDAS: Jika database benar-benar kosong di server production
+  if (!realUsername || !realPassword) {
+    return c.render(<LoginUI error="Database D1 Anda kosong! Anda belum menjalankan perintah eksekusi schema.sql ke server remote Cloudflare." />)
+  }
+
+  // Pencocokan Kredensial
+  if (inputUsername === realUsername && inputPassword === realPassword) {
     const token = await sign({ username: inputUsername, exp: Math.floor(Date.now() / 1000) + 86400 }, c.env.JWT_SECRET)
     setCookie(c, 'auth_token', token, { path: '/', httpOnly: true, secure: true, sameSite: 'Strict' })
     return c.redirect('/admin/dashboard')
   }
+  
   return c.render(<LoginUI error="Username atau password salah!" />)
 })
 
@@ -34,7 +42,7 @@ function LoginUI({ error }: { error?: string }) {
         
         {error && (
           <script dangerouslySetInnerHTML={{ __html: `
-            Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: '${error}', showConfirmButton: false, timer: 4000, timerProgressBar: true });
+            Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: '${error}', showConfirmButton: false, timer: 6000, timerProgressBar: true });
           `}} />
         )}
 
