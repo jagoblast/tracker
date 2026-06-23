@@ -32,6 +32,7 @@ app.use('/*', async (c, next) => {
         <meta property="og:title" content="${link.og_title}" />
         <meta property="og:description" content="${link.og_description}" />
         <meta property="og:image" content="${link.og_image_url}" />
+        <meta property="og:site_name" content="${link.og_site_name}" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="${link.og_title}" />
         <meta name="twitter:description" content="${link.og_description}" />
