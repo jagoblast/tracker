@@ -11,8 +11,9 @@ app.use('/*', async (c, next) => {
 
   const lookupSlug = path.substring(1)
   
+  // PERBARUAN: Tambahkan pengambilan kolom og_url
   const link = await c.env.DB.prepare('SELECT * FROM links WHERE slug = ?').bind(lookupSlug).first<{
-    target_url: string, og_title: string, og_description: string, og_image_url: string, og_site_name: string
+    target_url: string, og_title: string, og_description: string, og_image_url: string, og_site_name: string, og_url: string
   }>()
 
   if (!link) return c.text('Link tidak ditemukan', 404)
@@ -20,16 +21,21 @@ app.use('/*', async (c, next) => {
   const userAgent = c.req.header('user-agent') || ''
   const isBot = /facebookexternalhit|WhatsApp|Twitterbot|Pinterest|LinkedInBot|TelegramBot/i.test(userAgent)
 
-  // PERBAIKAN: Tambahkan cek "c.req.query('debug') === '1'"
-  if (isBot || c.req.query('debug') === '1') {
+  if (isBot) {
+    // PERBARUAN: Gunakan og_url dari database, jika kosong gunakan URL request saat ini
+    const canonicalUrl = link.og_url ? link.og_url : c.req.url
+
     return c.html(`
       <!DOCTYPE html>
       <html lang="id">
       <head>
         <meta charset="UTF-8" />
         <title>${link.og_title}</title>
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="${c.req.url}" />
+        
+        <meta property="og:url" content="${canonicalUrl}" />
+        <link rel="canonical" href="${canonicalUrl}" />
+        
+        <meta property="og:type" content="article" />
         <meta property="og:title" content="${link.og_title}" />
         <meta property="og:description" content="${link.og_description}" />
         <meta property="og:image" content="${link.og_image_url}" />
@@ -41,11 +47,7 @@ app.use('/*', async (c, next) => {
         <meta name="twitter:description" content="${link.og_description}" />
         <meta name="twitter:image" content="${link.og_image_url}" />
       </head>
-      <body style="background:#f3f4f6; padding: 2rem; font-family: sans-serif;">
-        <h2>Mode Debug Aktif</h2>
-        <p>Nilai og_site_name dari database adalah: <b>${link.og_site_name || 'KOSONG / UNDEFINED'}</b></p>
-        <p>Silakan klik kanan dan pilih <b>"View Page Source"</b> untuk melihat struktur tag meta-nya.</p>
-      </body>
+      <body>Mengarahkan...</body>
       </html>
     `)
   }
