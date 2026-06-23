@@ -8,8 +8,9 @@ export const POST = createRoute(async (c) => {
   
   if (body._action === 'UPDATE') {
     let slug = (body.slug as string).replace(/^\/+|\/+$/g, '')
-    await c.env.DB.prepare('UPDATE links SET name=?, slug=?, target_url=?, og_title=?, og_description=?, og_image_url=?, og_site_name=? WHERE id=?')
-      .bind(body.name as string, slug, body.target_url as string, body.og_title as string, body.og_description as string, body.og_image_url as string, body.og_site_name as string, id).run()
+    // UPDATE Query ditambahkan og_url
+    await c.env.DB.prepare('UPDATE links SET name=?, slug=?, target_url=?, og_title=?, og_description=?, og_image_url=?, og_site_name=?, og_url=? WHERE id=?')
+      .bind(body.name as string, slug, body.target_url as string, body.og_title as string, body.og_description as string, body.og_image_url as string, body.og_site_name as string, body.og_url as string, id).run()
     successMsg = 'Tautan berhasil diperbarui!'
   } else if (body._action === 'DELETE') {
     await c.env.DB.prepare('DELETE FROM links WHERE id=?').bind(id).run()
@@ -53,6 +54,12 @@ async function renderPage(c: any, id: string, successMsg = '') {
               <label className="block text-sm font-semibold text-gray-700 mb-1">Target URL Afiliasi</label>
               <input type="url" name="target_url" defaultValue={link.target_url} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" required />
             </div>
+
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Fake Canonical URL</label>
+              <input type="url" name="og_url" id="input-canonical" defaultValue={link.og_url} className="w-full px-4 py-2 border rounded-lg focus:ring-yellow-500 outline-none" />
+            </div>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Situs / Domain</label>
               <input type="text" name="og_site_name" id="input-domain" defaultValue={link.og_site_name} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none" />
@@ -95,13 +102,22 @@ async function renderPage(c: any, id: string, successMsg = '') {
         function upd() {
           document.getElementById('prev-title').innerText = document.getElementById('input-title').value || 'Judul Menarik Di Sini';
           document.getElementById('prev-desc').innerText = document.getElementById('input-desc').value || 'Deskripsi singkat penawaran...';
+          
           const domainInput = document.getElementById('input-domain').value;
-          document.getElementById('prev-domain').innerText = (domainInput || window.location.hostname).toUpperCase();
+          const canonicalInput = document.getElementById('input-canonical').value;
+          let displayDomain = window.location.hostname;
+          if (domainInput) {
+            displayDomain = domainInput;
+          } else if (canonicalInput) {
+            try { displayDomain = new URL(canonicalInput).hostname; } catch(e) {}
+          }
+          document.getElementById('prev-domain').innerText = displayDomain.toUpperCase();
+          
           const i = document.getElementById('input-img').value;
           if(i) document.getElementById('prev-img').src = i;
         }
         document.addEventListener('DOMContentLoaded', upd);
-        ['input-title','input-desc','input-domain','input-img'].forEach(id => document.getElementById(id)?.addEventListener('input', upd));
+        ['input-title','input-desc','input-domain','input-canonical','input-img'].forEach(id => document.getElementById(id)?.addEventListener('input', upd));
 
         function confirmDelete() {
           Swal.fire({
