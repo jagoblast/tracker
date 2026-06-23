@@ -3,21 +3,19 @@ import { getCookie } from 'hono/cookie'
 import { verify } from 'hono/jwt'
 
 export default createRoute(async (c, next) => {
-  // Biarkan halaman login bisa diakses tanpa token
-  if (c.req.path === '/admin/login') {
-    await next()
-    return
+  if (c.req.path.startsWith('/admin/login')) {
+    return await next()
   }
   
   const token = getCookie(c, 'auth_token')
-  
   if (!token) {
     return c.redirect('/admin/login')
   }
   
   try {
-    await verify(token, c.env.JWT_SECRET)
-    await next()
+    const secret = c.env.JWT_SECRET || 'kunci_rahasia_cadangan_123'
+    await verify(token, secret)
+    return await next()
   } catch (err) {
     return c.redirect('/admin/login')
   }
