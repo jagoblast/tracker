@@ -1,25 +1,32 @@
 import { createRoute } from 'honox/factory'
 import { sign } from 'hono/jwt'
 import { setCookie } from 'hono/cookie'
+import { hashPassword } from '../../utils/hash'
 
 export const POST = createRoute(async (c) => {
   try {
     const body = await c.req.parseBody()
     const inputUsername = (body.username as string).trim()
     const inputPassword = (body.password as string).trim()
+    const secret = c.env.JWT_SECRET || 'kunci_rahasia_cadangan_123'
 
-    // PERBAIKAN 1: Menggunakan Binding '?' agar D1 membaca teks dengan sempurna
-    const userDbRes = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = ?').bind('admin_username').first<{value: string}>()
-    const adminRes = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = ?').bind('admin_password').first<{value: string}>()
+    const userDbRes = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_username"').first<{value: string}>()
+    const adminRes = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_password"').first<{value: string}>()
 
-    const realUser = userDbRes?.value?.trim()
-    const realPass = adminRes?.value?.trim()
+    // Jika database benar-benar kosong, arahkan ke register
+    if (!userDbRes?.value) {
+      return c.redirect('/admin/register')
+    }
 
-    if (inputUsername === realUser && inputPassword === realPass) {
-      const secret = c.env.JWT_SECRET || 'kunci_rahasia_cadangan_123'
-      const token = await sign({ username: inputUsername, exp: Math.floor(Date.now() / 1000) + 86400 }, secret)
-      
-      // PERBAIKAN 2: Gunakan sameSite 'Lax' agar cookie bertahan saat redirect dari POST ke GET
+    const realUser = userDbRes.value.trim()
+    const realPassHash = adminRes?.value?.trim()
+
+    // HASH password inputan sebelum dicocokkan
+    const hashedInputPassword = await hashPassword(inputPassword, secret)
+
+    if (inputUsername === realUser && hashedInputPassword === realPassHash) {
+      // EKSPLISIT ALG HS256
+      const token = await sign({ username: inputUsername, exp: Math.floor(Date.now() / 1000) + 86400 }, secret, 'HS256')
       setCookie(c, 'auth_token', token, { path: '/', httpOnly: true, secure: true, maxAge: 86400, sameSite: 'Lax' })
       return c.redirect('/admin/dashboard')
     }
@@ -30,7 +37,10 @@ export const POST = createRoute(async (c) => {
   }
 })
 
-export default createRoute((c) => {
+export default createRoute(async (c) => {
+  const checkUser = await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = "admin_username"').first<{value: string}>()
+  if (!checkUser?.value) return c.redirect('/admin/register')
+  
   return c.render(<LoginUI />)
 })
 
