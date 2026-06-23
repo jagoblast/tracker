@@ -2,14 +2,12 @@ import { createApp } from 'honox/server'
 
 const app = createApp()
 
-// Gunakan app.use (Middleware), BUKAN app.get, agar logika catch-all tidak memblokir rute lain
 app.use('/*', async (c, next) => {
   const path = c.req.path
   
-  // Jangan proses jika url mengarah ke panel admin, statis, atau beranda
   if (path.startsWith('/admin') || path === '/' || path.startsWith('/static')) {
-    await next()
-    return
+    // PERBAIKAN 3: Wajib ada kata "return" agar Response halaman admin diproses
+    return await next()
   }
 
   const lookupSlug = path.substring(1)
@@ -44,7 +42,6 @@ app.use('/*', async (c, next) => {
     `)
   }
 
-  // Tulis metrik ke Analytics Engine
   if (c.env.ANALYTICS) {
     try {
       c.env.ANALYTICS.writeDataPoint({
