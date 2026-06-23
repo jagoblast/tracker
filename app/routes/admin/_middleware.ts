@@ -3,7 +3,8 @@ import { getCookie } from 'hono/cookie'
 import { verify } from 'hono/jwt'
 
 export default createRoute(async (c, next) => {
-  if (c.req.path.startsWith('/admin/login')) {
+  // Izinkan akses bebas ke login dan register
+  if (c.req.path.startsWith('/admin/login') || c.req.path.startsWith('/admin/register')) {
     return await next()
   }
   
@@ -14,7 +15,8 @@ export default createRoute(async (c, next) => {
   
   try {
     const secret = c.env.JWT_SECRET || 'kunci_rahasia_cadangan_123'
-    await verify(token, secret)
+    // EKSPLISIT VERIFIKASI HS256
+    await verify(token, secret, 'HS256')
     return await next()
   } catch (err) {
     return c.redirect('/admin/login')
