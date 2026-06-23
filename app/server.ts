@@ -2,13 +2,14 @@ import { createApp } from 'honox/server'
 
 const app = createApp()
 
-// Smart Catch-All Redirector (Untuk menangani klik dari pengunjung)
-app.get('/*', async (c, next) => {
+// Gunakan app.use (Middleware), BUKAN app.get, agar logika catch-all tidak memblokir rute lain
+app.use('/*', async (c, next) => {
   const path = c.req.path
   
-  // Jangan proses jika url mengarah ke panel admin atau halaman statis
+  // Jangan proses jika url mengarah ke panel admin, statis, atau beranda
   if (path.startsWith('/admin') || path === '/' || path.startsWith('/static')) {
-    return await next()
+    await next()
+    return
   }
 
   const lookupSlug = path.substring(1)
@@ -43,7 +44,7 @@ app.get('/*', async (c, next) => {
     `)
   }
 
-  // Tulis ke Analytics Engine
+  // Tulis metrik ke Analytics Engine
   if (c.env.ANALYTICS) {
     try {
       c.env.ANALYTICS.writeDataPoint({
@@ -53,7 +54,6 @@ app.get('/*', async (c, next) => {
     } catch (e) {}
   }
 
-  // Pengunjung manusia diarahkan ke url target
   return c.redirect(link.target_url, 302)
 })
 
