@@ -1,27 +1,12 @@
-import { getCookie } from 'hono/cookie'
-import { verify } from 'hono/jwt'
 import { createApp } from 'honox/server'
 
 const app = createApp()
 
-// Middleware Autentikasi Admin
-app.use('/admin/*', async (c, next) => {
-  if (c.req.path === '/admin/login') return await next()
-  
-  const token = getCookie(c, 'auth_token')
-  if (!token) return c.redirect('/admin/login')
-  
-  try {
-    await verify(token, c.env.JWT_SECRET)
-    await next()
-  } catch (err) {
-    return c.redirect('/admin/login')
-  }
-})
-
-// Smart Catch-All Redirector
+// Smart Catch-All Redirector (Untuk menangani klik dari pengunjung)
 app.get('/*', async (c, next) => {
   const path = c.req.path
+  
+  // Jangan proses jika url mengarah ke panel admin atau halaman statis
   if (path.startsWith('/admin') || path === '/' || path.startsWith('/static')) {
     return await next()
   }
@@ -58,6 +43,7 @@ app.get('/*', async (c, next) => {
     `)
   }
 
+  // Tulis ke Analytics Engine
   if (c.env.ANALYTICS) {
     try {
       c.env.ANALYTICS.writeDataPoint({
@@ -67,6 +53,7 @@ app.get('/*', async (c, next) => {
     } catch (e) {}
   }
 
+  // Pengunjung manusia diarahkan ke url target
   return c.redirect(link.target_url, 302)
 })
 
