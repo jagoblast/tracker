@@ -11,7 +11,6 @@ app.use('/*', async (c, next) => {
 
   const lookupSlug = path.substring(1)
   
-  // PERBAIKAN: Tambahkan og_url ke dalam definisi tipe data yang ditarik dari D1
   const link = await c.env.DB.prepare('SELECT * FROM links WHERE slug = ?').bind(lookupSlug).first<{
     target_url: string, og_title: string, og_description: string, og_image_url: string, og_site_name: string, og_url: string
   }>()
@@ -22,7 +21,7 @@ app.use('/*', async (c, next) => {
   const isBot = /facebookexternalhit|WhatsApp|Twitterbot|Pinterest|LinkedInBot|TelegramBot/i.test(userAgent)
 
   if (isBot) {
-    // PERBAIKAN: Gunakan og_url dari database (Fake Canonical). Jika tidak diisi, baru fallback ke URL asli
+    // Sesuai instruksi Anda: Jadikan og_url dari database sebagai og:url dan canonical
     const canonicalUrl = link.og_url ? link.og_url : c.req.url
 
     return c.html(`
@@ -61,7 +60,6 @@ app.use('/*', async (c, next) => {
     } catch (e) {}
   }
 
-  // Jika pengunjung adalah MANUSIA, langsung ditendang ke Shopee/Tokopedia
   return c.redirect(link.target_url, 302)
 })
 
