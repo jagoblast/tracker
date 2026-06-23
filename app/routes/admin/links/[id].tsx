@@ -1,23 +1,30 @@
 import { createRoute } from 'honox/factory'
 import { AdminShell } from '../../../components/AdminShell'
 
-export default createRoute(async (c) => {
+export const POST = createRoute(async (c) => {
   const id = c.req.param('id')
   let successMsg = ''
-
-  if (c.req.method === 'POST') {
-    const body = await c.req.parseBody()
-    if (body._action === 'UPDATE') {
-      let slug = (body.slug as string).replace(/^\/+|\/+$/g, '')
-      await c.env.DB.prepare('UPDATE links SET name=?, slug=?, target_url=?, og_title=?, og_description=?, og_image_url=?, og_site_name=? WHERE id=?')
-        .bind(body.name as string, slug, body.target_url as string, body.og_title as string, body.og_description as string, body.og_image_url as string, body.og_site_name as string, id).run()
-      successMsg = 'Tautan berhasil diperbarui!'
-    } else if (body._action === 'DELETE') {
-      await c.env.DB.prepare('DELETE FROM links WHERE id=?').bind(id).run()
-      return c.redirect('/admin/links')
-    }
+  const body = await c.req.parseBody()
+  
+  if (body._action === 'UPDATE') {
+    let slug = (body.slug as string).replace(/^\/+|\/+$/g, '')
+    await c.env.DB.prepare('UPDATE links SET name=?, slug=?, target_url=?, og_title=?, og_description=?, og_image_url=?, og_site_name=? WHERE id=?')
+      .bind(body.name as string, slug, body.target_url as string, body.og_title as string, body.og_description as string, body.og_image_url as string, body.og_site_name as string, id).run()
+    successMsg = 'Tautan berhasil diperbarui!'
+  } else if (body._action === 'DELETE') {
+    await c.env.DB.prepare('DELETE FROM links WHERE id=?').bind(id).run()
+    return c.redirect('/admin/links')
   }
+  
+  return await renderPage(c, id, successMsg)
+})
 
+export default createRoute(async (c) => {
+  const id = c.req.param('id')
+  return await renderPage(c, id)
+})
+
+async function renderPage(c: any, id: string, successMsg = '') {
   const link = await c.env.DB.prepare('SELECT * FROM links WHERE id=?').bind(id).first<any>()
   if (!link) return c.text('Link tidak ditemukan', 404)
 
@@ -34,7 +41,6 @@ export default createRoute(async (c) => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <form method="POST" className="flex flex-col gap-4">
             <input type="hidden" name="_action" value="UPDATE" />
-            
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Internal Link</label>
               <input type="text" name="name" defaultValue={link.name} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 outline-none bg-blue-50" required />
@@ -108,4 +114,4 @@ export default createRoute(async (c) => {
     </AdminShell>,
     { title: 'Edit ' + link.name }
   )
-})
+}
