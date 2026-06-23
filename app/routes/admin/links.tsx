@@ -8,57 +8,62 @@ async function getCloudinarySignature(timestamp: string, apiSecret: string) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-export default createRoute(async (c) => {
+export const POST = createRoute(async (c) => {
   let successMsg = ''
   let errorMsg = ''
   
-  if (c.req.method === 'POST') {
-    const body = await c.req.parseBody()
-    let name = body.name as string || 'Untitled Link'
-    let slug = (body.slug as string).replace(/^\/+|\/+$/g, '')
-    let finalImageUrl = body.og_image_url as string || ''
-    let siteName = body.og_site_name as string || ''
+  const body = await c.req.parseBody()
+  let name = body.name as string || 'Untitled Link'
+  let slug = (body.slug as string).replace(/^\/+|\/+$/g, '')
+  let finalImageUrl = body.og_image_url as string || ''
+  let siteName = body.og_site_name as string || ''
 
-    const imageFile = body.image_file as File
-    if (imageFile && imageFile.size > 0) {
-      try {
-        const getSetting = async (k: string) => (await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key=?').bind(k).first<{value: string}>())?.value || ''
-        const cloudName = await getSetting('cloudinary_cloud_name')
-        const apiKey = await getSetting('cloudinary_api_key')
-        const apiSecret = await getSetting('cloudinary_secret')
+  const imageFile = body.image_file as File
+  if (imageFile && imageFile.size > 0) {
+    try {
+      const getSetting = async (k: string) => (await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key=?').bind(k).first<{value: string}>())?.value || ''
+      const cloudName = await getSetting('cloudinary_cloud_name')
+      const apiKey = await getSetting('cloudinary_api_key')
+      const apiSecret = await getSetting('cloudinary_secret')
 
-        if (!cloudName || !apiKey || !apiSecret) throw new Error('Kredensial Cloudinary belum diatur di Pengaturan!')
+      if (!cloudName || !apiKey || !apiSecret) throw new Error('Kredensial Cloudinary belum diatur di Pengaturan!')
 
-        const timestamp = Math.round(new Date().getTime() / 1000).toString()
-        const signature = await getCloudinarySignature(timestamp, apiSecret)
+      const timestamp = Math.round(new Date().getTime() / 1000).toString()
+      const signature = await getCloudinarySignature(timestamp, apiSecret)
 
-        const formData = new FormData()
-        formData.append('file', imageFile)
-        formData.append('api_key', apiKey)
-        formData.append('timestamp', timestamp)
-        formData.append('signature', signature)
+      const formData = new FormData()
+      formData.append('file', imageFile)
+      formData.append('api_key', apiKey)
+      formData.append('timestamp', timestamp)
+      formData.append('signature', signature)
 
-        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: formData })
-        const uploadJson = await uploadRes.json() as any
-        
-        if (uploadJson.secure_url) {
-          finalImageUrl = uploadJson.secure_url.replace('/upload/', '/upload/c_fill,w_1200,h_630,f_webp/')
-        } else {
-          throw new Error('Gagal mengunggah ke Cloudinary.')
-        }
-      } catch (err: any) {
-        errorMsg = err.message
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: formData })
+      const uploadJson = await uploadRes.json() as any
+      
+      if (uploadJson.secure_url) {
+        finalImageUrl = uploadJson.secure_url.replace('/upload/', '/upload/c_fill,w_1200,h_630,f_webp/')
+      } else {
+        throw new Error('Gagal mengunggah ke Cloudinary.')
       }
-    }
-
-    if (!errorMsg) {
-      await c.env.DB.prepare('INSERT INTO links (name, slug, target_url, og_title, og_description, og_image_url, og_site_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .bind(name, slug, body.target_url as string, body.og_title as string, body.og_description as string, finalImageUrl, siteName).run()
-      successMsg = 'Tautan afiliasi baru berhasil dibuat!'
+    } catch (err: any) {
+      errorMsg = err.message
     }
   }
 
-  // Menambahkan pemanggilan field 'name'
+  if (!errorMsg) {
+    await c.env.DB.prepare('INSERT INTO links (name, slug, target_url, og_title, og_description, og_image_url, og_site_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(name, slug, body.target_url as string, body.og_title as string, body.og_description as string, finalImageUrl, siteName).run()
+    successMsg = 'Tautan afiliasi baru berhasil dibuat!'
+  }
+
+  return await renderPage(c, successMsg, errorMsg)
+})
+
+export default createRoute(async (c) => {
+  return await renderPage(c)
+})
+
+async function renderPage(c: any, successMsg = '', errorMsg = '') {
   const linksList = await c.env.DB.prepare('SELECT id, name, slug FROM links ORDER BY id DESC').all<{id: number, name: string, slug: string}>()
 
   return c.render(
@@ -75,12 +80,10 @@ export default createRoute(async (c) => {
           <h2 className="text-lg font-bold text-gray-800 mb-6">Buat Tautan Pintar</h2>
           
           <form method="POST" encType="multipart/form-data" className="flex flex-col gap-4">
-            {/* INPUT NAMA LINK INTERNAL */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Internal Link</label>
               <input type="text" name="name" placeholder="Misal: Promo Celana Cutbray FB" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50" required />
             </div>
-
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Custom Slug (Gunakan '/')</label>
               <input type="text" name="slug" placeholder="promo/sepatu" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
@@ -89,12 +92,10 @@ export default createRoute(async (c) => {
               <label className="block text-sm font-semibold text-gray-700 mb-1">Target URL Afiliasi</label>
               <input type="url" name="target_url" placeholder="https://shopee..." className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
             </div>
-            
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Situs / Domain (Opsional)</label>
               <input type="text" name="og_site_name" id="input-domain" placeholder="Misal: Toko Laris" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
-
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Judul Open Graph</label>
               <input type="text" name="og_title" id="input-title" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
@@ -103,7 +104,6 @@ export default createRoute(async (c) => {
               <label className="block text-sm font-semibold text-gray-700 mb-1">Deskripsi Open Graph</label>
               <input type="text" name="og_description" id="input-desc" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
             </div>
-            
             <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Upload Gambar (Cloudinary)</label>
               <input type="file" name="image_file" accept="image/*" id="input-img-file" className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
@@ -111,13 +111,11 @@ export default createRoute(async (c) => {
               <label className="block text-xs font-semibold text-gray-500 mb-1">Tempel URL Gambar Eksternal</label>
               <input type="url" name="og_image_url" id="input-img-url" placeholder="https://..." className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none" />
             </div>
-
             <button type="submit" className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition">Simpan & Upload</button>
           </form>
         </div>
 
         <div className="flex flex-col gap-8">
-          {/* ... [Blok Live Facebook Preview Tetap Sama] ... */}
           <div className="bg-gray-100 p-6 rounded-xl border border-gray-200 border-dashed">
             <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Live Facebook Preview</h2>
             <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm max-w-[500px]">
@@ -169,4 +167,4 @@ export default createRoute(async (c) => {
     </AdminShell>,
     { title: 'Manajemen Links' }
   )
-})
+}
