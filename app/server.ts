@@ -11,7 +11,6 @@ app.use('/*', async (c, next) => {
 
   const lookupSlug = path.substring(1)
   
-  // PERBAIKAN 1: Tambahkan og_site_name pada tipe kembalian database
   const link = await c.env.DB.prepare('SELECT * FROM links WHERE slug = ?').bind(lookupSlug).first<{
     target_url: string, og_title: string, og_description: string, og_image_url: string, og_site_name: string
   }>()
@@ -21,7 +20,8 @@ app.use('/*', async (c, next) => {
   const userAgent = c.req.header('user-agent') || ''
   const isBot = /facebookexternalhit|WhatsApp|Twitterbot|Pinterest|LinkedInBot|TelegramBot/i.test(userAgent)
 
-  if (isBot) {
+  // PERBAIKAN: Tambahkan cek "c.req.query('debug') === '1'"
+  if (isBot || c.req.query('debug') === '1') {
     return c.html(`
       <!DOCTYPE html>
       <html lang="id">
@@ -41,7 +41,11 @@ app.use('/*', async (c, next) => {
         <meta name="twitter:description" content="${link.og_description}" />
         <meta name="twitter:image" content="${link.og_image_url}" />
       </head>
-      <body>Mengarahkan...</body>
+      <body style="background:#f3f4f6; padding: 2rem; font-family: sans-serif;">
+        <h2>Mode Debug Aktif</h2>
+        <p>Nilai og_site_name dari database adalah: <b>${link.og_site_name || 'KOSONG / UNDEFINED'}</b></p>
+        <p>Silakan klik kanan dan pilih <b>"View Page Source"</b> untuk melihat struktur tag meta-nya.</p>
+      </body>
       </html>
     `)
   }
